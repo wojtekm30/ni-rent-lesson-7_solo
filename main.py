@@ -1,3 +1,4 @@
+import sys
 from src.manager import Manager
 from src.models import Parameters
 
@@ -33,7 +34,6 @@ def display_apartments(manager):
         for room in apartment.rooms.values():
             print(f"      • {room.name:<25} {room.area_m2:>6} m²")
         
-        # Find bills for this apartment
         apartment_bills = [bill for bill in manager.bills if bill.apartment == apartment.key]
         if apartment_bills:
             print_subsection_header("Bills")
@@ -54,7 +54,6 @@ def display_tenants(manager):
         print(f"   Deposit: {format_currency(tenant.deposit_pln)}")
         print(f"   Agreement: {tenant.date_agreement_from} to {tenant.date_agreement_to}")
         
-        # Find transfers for this tenant
         tenant_transfers = [transfer for transfer in manager.transfers if transfer.tenant == tenant.name]
         if tenant_transfers:
             print_subsection_header("Transfers")
@@ -63,11 +62,49 @@ def display_tenants(manager):
                 print(f"      • {format_currency(transfer.amount_pln):>15}  Date: {transfer.date}  Period: {month_year}")
 
 
+def display_settlement(manager: Manager, apartment_key: str, year: int, month: int):
+    """Display settlement details for a specific apartment and period"""
+    settlement = manager.get_settlement(apartment_key, year, month)
+    if settlement is None:
+        print(f"\n❌ Nie znaleziono mieszkania o kluczu '{apartment_key}'.")
+        return
+
+    tenant_settlements = manager.create_tenants_settlements(settlement)
+
+    print_section_header(f"SETTLEMENT: {apartment_key} ({year}-{month:02d})")
+    print(f"\n🏠 Apartment: {apartment_key}")
+    print(f"   Period:    {month}/{year}")
+    print(f"   Total Due: {format_currency(settlement.total_due_pln)}")
+
+    print_subsection_header("Tenants Breakdown")
+    if not tenant_settlements:
+        print("      Brak przypisanych lokatorów.")
+    else:
+        for ts in tenant_settlements:
+            print(f"      • {ts.tenant:<25} {format_currency(ts.total_due_pln):>15}")
+
+
 if __name__ == '__main__':
     parameters = Parameters()
     manager = Manager(parameters)
 
-    display_apartments(manager)
-    display_tenants(manager)
-    
+    if len(sys.argv) >= 4:
+        apartment_key = sys.argv[1]
+        try:
+            year = int(sys.argv[2])
+            month = int(sys.argv[3])
+            display_settlement(manager, apartment_key, year, month)
+        except ValueError as e:
+            print(f"\n❌ Błąd parametrów: {e}")
+            print("Użycie: python main.py <apartment_key> <year> <month>")
+            sys.exit(1)
+    elif len(sys.argv) > 1:
+        print("\n❌ Podano niepełne argumenty.")
+        print("Użycie: python main.py <apartment_key> <year> <month>")
+        print("Przykład: python main.py apart-polanka 2024 1")
+        sys.exit(1)
+    else:
+        display_apartments(manager)
+        display_tenants(manager)
+
     print(f"\n{'=' * 70}\n")
